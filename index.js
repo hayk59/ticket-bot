@@ -165,10 +165,11 @@ client.on("interactionCreate", async interaction => {
 /* ================= VOCAUX TEMPORAIRES BDA ================= */
 
 client.on("voiceStateUpdate", async (oldState, newState) => {
-  if (!oldState.channel && newState.channel?.id === BDA_TRIGGER_VOICE) {
-    const guild = newState.guild;
-    const member = newState.member;
+  const member = newState.member;
+  const guild = newState.guild;
 
+  // 🔹 Rejoint le salon déclencheur (peu importe d’où il vient)
+  if (newState.channelId === BDA_TRIGGER_VOICE) {
     const tempChannel = await guild.channels.create({
       name: BDA_CHANNEL_NAME,
       type: ChannelType.GuildVoice,
@@ -183,8 +184,10 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     await member.voice.setChannel(tempChannel);
   }
 
-  if (oldState.channel && !newState.channel) {
+  // 🔹 Quitte un salon → suppression s’il est vide
+  if (oldState.channel) {
     const channel = oldState.channel;
+
     if (
       channel.parentId === BDA_CATEGORY_ID &&
       channel.name === BDA_CHANNEL_NAME &&
@@ -197,18 +200,19 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
 /* ================= ROLE PAR REACTION ================= */
 
+const REACTION_EMOJI = "✅";
+
 client.on("messageReactionAdd", async (reaction, user) => {
   if (user.bot) return;
   if (reaction.partial) await reaction.fetch();
 
   if (
     reaction.message.id === REACTION_MESSAGE_ID &&
-    reaction.message.channel.id === REACTION_CHANNEL_ID
+    reaction.message.channel.id === REACTION_CHANNEL_ID &&
+    reaction.emoji.name === REACTION_EMOJI
   ) {
     const member = await reaction.message.guild.members.fetch(user.id);
-    if (!member.roles.cache.has(REACTION_ROLE_ID)) {
-      await member.roles.add(REACTION_ROLE_ID);
-    }
+    await member.roles.add(REACTION_ROLE_ID).catch(() => {});
   }
 });
 
@@ -218,12 +222,11 @@ client.on("messageReactionRemove", async (reaction, user) => {
 
   if (
     reaction.message.id === REACTION_MESSAGE_ID &&
-    reaction.message.channel.id === REACTION_CHANNEL_ID
+    reaction.message.channel.id === REACTION_CHANNEL_ID &&
+    reaction.emoji.name === REACTION_EMOJI
   ) {
     const member = await reaction.message.guild.members.fetch(user.id);
-    if (member.roles.cache.has(REACTION_ROLE_ID)) {
-      await member.roles.remove(REACTION_ROLE_ID);
-    }
+    await member.roles.remove(REACTION_ROLE_ID).catch(() => {});
   }
 });
 
