@@ -168,23 +168,36 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   const member = newState.member;
   const guild = newState.guild;
 
-  // 🔹 Rejoint le salon déclencheur (peu importe d’où il vient)
+  // 🔹 Rejoint le salon déclencheur
   if (newState.channelId === BDA_TRIGGER_VOICE) {
-    const tempChannel = await guild.channels.create({
-      name: BDA_CHANNEL_NAME,
-      type: ChannelType.GuildVoice,
-      parent: BDA_CATEGORY_ID,
-      userLimit: 1,
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, deny: ["Connect"] },
-        { id: member.id, allow: ["Connect", "Speak"] }
-      ]
-    });
+    try {
+      const tempChannel = await guild.channels.create({
+        name: BDA_CHANNEL_NAME,
+        type: ChannelType.GuildVoice,
+        parent: BDA_CATEGORY_ID,
+        userLimit: 1,
+        permissionOverwrites: [
+          {
+            id: guild.roles.everyone.id,
+            deny: [PermissionsBitField.Flags.Connect]
+          },
+          {
+            id: member.id,
+            allow: [
+              PermissionsBitField.Flags.Connect,
+              PermissionsBitField.Flags.Speak
+            ]
+          }
+        ]
+      });
 
-    await member.voice.setChannel(tempChannel);
+      await member.voice.setChannel(tempChannel);
+    } catch (err) {
+      console.error("Erreur création vocal BDA :", err);
+    }
   }
 
-  // 🔹 Quitte un salon → suppression s’il est vide
+  // 🔹 Suppression automatique quand vide
   if (oldState.channel) {
     const channel = oldState.channel;
 
@@ -197,6 +210,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
     }
   }
 });
+
 
 /* ================= ROLE PAR REACTION ================= */
 
