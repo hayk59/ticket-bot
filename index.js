@@ -1,6 +1,7 @@
 const {
   Client,
   GatewayIntentBits,
+  Partials,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -12,12 +13,17 @@ require("dotenv").config();
 /* ================= CLIENT ================= */
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMessageReactions
+  ],
+  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
-/* ================= CONFIG ================= */
+/* ================= CONFIG TICKETS ================= */
 
-// Salons où le bouton ticket doit être présent
 const OPEN_CHANNELS_1 = [
   "1448739344100626502",
   "1448741008090071071",
@@ -30,23 +36,32 @@ const OPEN_CHANNELS_1 = [
 
 const OPEN_CHANNEL_2 = "1449182593009319936";
 
-// Catégories de tickets
 const CATEGORY_1 = "1448788857490509924";
 const CATEGORY_2 = "1448788432645132318";
 
-// Rôles ping à l’ouverture
 const PING_ROLES = [
   "1448780493150617681",
   "1448780389589188648"
 ];
 
-// Rôles autorisés à voir / fermer le ticket
 const ALLOWED_ROLES = [
   "1448780389589188648",
   "1448780493150617681",
   "1448780658259398656",
   "1448734987900944606"
 ];
+
+/* ================= CONFIG VOCAUX BDA ================= */
+
+const BDA_TRIGGER_VOICE = "1450478737765437471";
+const BDA_CATEGORY_ID = "1448784723991072889";
+const BDA_CHANNEL_NAME = "attente moov ⚠️";
+
+/* ================= CONFIG ROLE REACTION ================= */
+
+const REACTION_ROLE_ID = "1448779499545034983";
+const REACTION_MESSAGE_ID = "1450541390571507772";
+const REACTION_CHANNEL_ID = "1448736176801452222";
 
 /* ================= READY ================= */
 
@@ -77,25 +92,20 @@ client.once("ready", async () => {
         content: "🎟️ Support — cliquez ci-dessous pour ouvrir un ticket",
         components: [openButtonRow]
       });
-      console.log(`📩 Message ticket envoyé dans ${channel.name}`);
-    } else {
-      console.log(`✔ Message déjà présent dans ${channel.name}`);
     }
   }
 
   for (const id of OPEN_CHANNELS_1) {
     await ensureTicketMessage(id);
   }
-
   await ensureTicketMessage(OPEN_CHANNEL_2);
 });
 
-/* ================= INTERACTIONS ================= */
+/* ================= INTERACTIONS TICKETS ================= */
 
 client.on("interactionCreate", async interaction => {
   if (!interaction.isButton()) return;
 
-  /* ---------- OUVERTURE ---------- */
   if (interaction.customId === "open_ticket") {
     const category =
       interaction.channel.id === OPEN_CHANNEL_2
@@ -113,17 +123,11 @@ client.on("interactionCreate", async interaction => {
         },
         {
           id: interaction.user.id,
-          allow: [
-            PermissionsBitField.Flags.ViewChannel,
-            PermissionsBitField.Flags.SendMessages
-          ]
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
         },
         ...ALLOWED_ROLES.map(role => ({
           id: role,
-          allow: [
-            PermissionsBitField.Flags.ViewChannel,
-            PermissionsBitField.Flags.SendMessages
-          ]
+          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
         }))
       ]
     });
@@ -136,35 +140,90 @@ client.on("interactionCreate", async interaction => {
     );
 
     await ticketChannel.send({
-      content:
-        `${PING_ROLES.map(r => `<@&${r}>`).join(" ")}\n` +
-        `🎫 Ticket ouvert par ${interaction.user}`,
+      content: `${PING_ROLES.map(r => `<@&${r}>`).join(" ")}\n🎫 Ticket ouvert par ${interaction.user}`,
       components: [closeButtonRow]
     });
 
-    return interaction.reply({
-      content: "✅ Ton ticket a été créé",
-      ephemeral: true
-    });
+    return interaction.reply({ content: "✅ Ticket créé", ephemeral: true });
   }
 
-  /* ---------- FERMETURE ---------- */
   if (interaction.customId === "close_ticket") {
     const member = interaction.member;
-
     const allowed =
       interaction.channel.permissionOverwrites.cache.has(member.id) ||
       ALLOWED_ROLES.some(r => member.roles.cache.has(r));
 
     if (!allowed) {
-      return interaction.reply({
-        content: "❌ Tu n’as pas l’autorisation",
-        ephemeral: true
-      });
+      return interaction.reply({ content: "❌ Accès refusé", ephemeral: true });
     }
 
     await interaction.reply("🔒 Fermeture du ticket...");
     setTimeout(() => interaction.channel.delete().catch(() => {}), 4000);
+  }
+});
+
+/* ================= VOCAUX TEMPORAIRES BDA ================= */
+
+client.on("voiceStateUpdate", async (oldState, newState) => {
+  if (!oldState.channel && newState.channel?.id === BDA_TRIGGER_VOICE) {
+    const guild = newState.guild;
+    const member = newState.member;
+
+    const tempChannel = await guild.channels.create({
+      name: BDA_CHANNEL_NAME,
+      type: ChannelType.GuildVoice,
+      parent: BDA_CATEGORY_ID,
+      userLimit: 1,
+      permissionOverwrites: [
+        { id: guild.roles.everyone.id, deny: ["Connect"] },
+        { id: member.id, allow: ["Connect", "Speak"] }
+      ]
+    });
+
+    await member.voice.setChannel(tempChannel);
+  }
+
+  if (oldState.channel && !newState.channel) {
+    const channel = oldState.channel;
+    if (
+      channel.parentId === BDA_CATEGORY_ID &&
+      channel.name === BDA_CHANNEL_NAME &&
+      channel.members.size === 0
+    ) {
+      channel.delete().catch(() => {});
+    }
+  }
+});
+
+/* ================= ROLE PAR REACTION ================= */
+
+client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.bot) return;
+  if (reaction.partial) await reaction.fetch();
+
+  if (
+    reaction.message.id === REACTION_MESSAGE_ID &&
+    reaction.message.channel.id === REACTION_CHANNEL_ID
+  ) {
+    const member = await reaction.message.guild.members.fetch(user.id);
+    if (!member.roles.cache.has(REACTION_ROLE_ID)) {
+      await member.roles.add(REACTION_ROLE_ID);
+    }
+  }
+});
+
+client.on("messageReactionRemove", async (reaction, user) => {
+  if (user.bot) return;
+  if (reaction.partial) await reaction.fetch();
+
+  if (
+    reaction.message.id === REACTION_MESSAGE_ID &&
+    reaction.message.channel.id === REACTION_CHANNEL_ID
+  ) {
+    const member = await reaction.message.guild.members.fetch(user.id);
+    if (member.roles.cache.has(REACTION_ROLE_ID)) {
+      await member.roles.remove(REACTION_ROLE_ID);
+    }
   }
 });
 
