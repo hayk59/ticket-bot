@@ -17,7 +17,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
@@ -55,13 +56,14 @@ const ALLOWED_ROLES = [
 
 const BDA_TRIGGER_VOICE = "1450478737765437471";
 const BDA_CATEGORY_ID = "1448784723991072889";
-const BDA_CHANNEL_NAME = "Attente moov ⚠️";
+const BDA_CHANNEL_NAME = "Attente Moov ⚠️";
 
 /* ================= CONFIG ROLE REACTION ================= */
 
 const REACTION_ROLE_ID = "1448779499545034983";
-const REACTION_MESSAGE_ID = "1450923447793487872";
+const REACTION_MESSAGE_ID = "1450923447793487872"; // ⬅️ ID MIS À JOUR
 const REACTION_CHANNEL_ID = "1448736176801452222";
+const REACTION_EMOJI = "✅";
 
 /* ================= READY ================= */
 
@@ -123,11 +125,17 @@ client.on("interactionCreate", async interaction => {
         },
         {
           id: interaction.user.id,
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages
+          ]
         },
         ...ALLOWED_ROLES.map(role => ({
           id: role,
-          allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages]
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages
+          ]
         }))
       ]
     });
@@ -140,11 +148,16 @@ client.on("interactionCreate", async interaction => {
     );
 
     await ticketChannel.send({
-      content: `${PING_ROLES.map(r => `<@&${r}>`).join(" ")}\n🎫 Ticket ouvert par ${interaction.user}`,
+      content:
+        `${PING_ROLES.map(r => `<@&${r}>`).join(" ")}\n` +
+        `🎫 Ticket ouvert par ${interaction.user}`,
       components: [closeButtonRow]
     });
 
-    return interaction.reply({ content: "✅ Ticket créé", ephemeral: true });
+    return interaction.reply({
+      content: "✅ Ticket créé",
+      ephemeral: true
+    });
   }
 
   if (interaction.customId === "close_ticket") {
@@ -154,7 +167,10 @@ client.on("interactionCreate", async interaction => {
       ALLOWED_ROLES.some(r => member.roles.cache.has(r));
 
     if (!allowed) {
-      return interaction.reply({ content: "❌ Accès refusé", ephemeral: true });
+      return interaction.reply({
+        content: "❌ Accès refusé",
+        ephemeral: true
+      });
     }
 
     await interaction.reply("🔒 Fermeture du ticket...");
@@ -168,7 +184,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   const member = newState.member;
   const guild = newState.guild;
 
-  // 🔹 Rejoint le salon déclencheur
+  // Rejoint le salon déclencheur
   if (newState.channelId === BDA_TRIGGER_VOICE) {
     try {
       const tempChannel = await guild.channels.create({
@@ -193,11 +209,11 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
 
       await member.voice.setChannel(tempChannel);
     } catch (err) {
-      console.error("Erreur création vocal BDA :", err);
+      console.error("❌ Erreur création vocal BDA :", err);
     }
   }
 
-  // 🔹 Suppression automatique quand vide
+  // Suppression automatique quand vide
   if (oldState.channel) {
     const channel = oldState.channel;
 
@@ -211,10 +227,7 @@ client.on("voiceStateUpdate", async (oldState, newState) => {
   }
 });
 
-
 /* ================= ROLE PAR REACTION ================= */
-
-const REACTION_EMOJI = "✅";
 
 client.on("messageReactionAdd", async (reaction, user) => {
   if (user.bot) return;
