@@ -55,12 +55,12 @@ const ALLOWED_ROLES = [
 
 const BDA_TRIGGER_VOICE = "1450478737765437471";
 const BDA_CATEGORY_ID = "1448784723991072889";
-const BDA_CHANNEL_NAME = "attente moov ⚠️";
+const BDA_CHANNEL_NAME = "Attente moov ⚠️";
 
 /* ================= CONFIG ROLE REACTION ================= */
 
 const REACTION_ROLE_ID = "1448779499545034983";
-const REACTION_MESSAGE_ID = "1450541390571507772";
+const REACTION_MESSAGE_ID = "1450923447793487872";
 const REACTION_CHANNEL_ID = "1448736176801452222";
 
 /* ================= READY ================= */
