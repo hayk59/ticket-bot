@@ -91,7 +91,7 @@ client.once("ready", async () => {
 
     if (!exists) {
       await channel.send({
-        content: "🎟️ Support — cliquez ci-dessous pour ouvrir un ticket",
+        content: "Support",
         components: [openButtonRow]
       });
     }
